@@ -133,6 +133,27 @@ std::string application_file_dir(JNIEnv *env, jobject application)
     return method ? file_path(env, env->CallObjectMethod(application, method)) : std::string();
 }
 
+#ifdef MOD_ROOT_EXTERNAL
+std::string application_external_file_dir(JNIEnv *env, jobject application)
+{
+    jclass klass = env->GetObjectClass(application);
+    jmethodID method = env->GetMethodID(
+            klass, "getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;");
+    if (!method) return {};
+    jobject file = env->CallObjectMethod(application, method, nullptr);
+    return file_path(env, file);
+}
+
+int android_sdk_int(JNIEnv *env)
+{
+    jclass version = env->FindClass("android/os/Build$VERSION");
+    if (!version) return 0;
+    jfieldID field = env->GetStaticFieldID(version, "SDK_INT", "I");
+    if (!field) return 0;
+    return env->GetStaticIntField(version, field);
+}
+#endif
+
 std::string application_native_dir(JNIEnv *env, jobject application)
 {
     jclass context = env->GetObjectClass(application);
@@ -410,7 +431,21 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *)
         LOGE("Application is not available");
         return JNI_VERSION_1_6;
     }
+#ifdef MOD_ROOT_EXTERNAL
+    // 应用专属外部目录（/storage/emulated/0/Android/data/<pkg>/files）在 Android 10+
+    // 无需存储权限；低版本或外部存储不可用时回退到内部 files 目录。
+    std::string root_dir;
+    if (android_sdk_int(env) >= 29) {
+        root_dir = application_external_file_dir(env, application);
+    }
+    if (root_dir.empty()) {
+        root_dir = application_file_dir(env, application);
+    }
+    runtime.root = root_dir + "/mod";
+#else
     runtime.root = application_file_dir(env, application) + "/mod";
+#endif
+    LOGI("mod root: %s", runtime.root.c_str());
     runtime.native_dir = application_native_dir(env, application);
     runtime.game_dir = join_path(runtime.root, "game");
     runtime.core_dir = join_path(runtime.root, "BepInEx/core");
