@@ -42,6 +42,7 @@ struct Runtime {
     std::string game_dir;
     std::string core_dir;
     std::string dotnet_dir;
+    std::string package_name;
 };
 
 Runtime runtime;
@@ -131,6 +132,14 @@ std::string application_file_dir(JNIEnv *env, jobject application)
     jclass klass = env->GetObjectClass(application);
     jmethodID method = env->GetMethodID(klass, "getFilesDir", "()Ljava/io/File;");
     return method ? file_path(env, env->CallObjectMethod(application, method)) : std::string();
+}
+
+std::string application_package_name(JNIEnv *env, jobject application)
+{
+    jclass klass = env->GetObjectClass(application);
+    jmethodID method = env->GetMethodID(klass, "getPackageName", "()Ljava/lang/String;");
+    if (!method) return {};
+    return java_string(env, static_cast<jstring>(env->CallObjectMethod(application, method)));
 }
 
 #ifdef MOD_ROOT_EXTERNAL
@@ -327,7 +336,8 @@ std::string tpa_for(const std::string &directory)
 
 void set_environment()
 {
-    const std::string process = join_path(runtime.game_dir, "Game");
+    const std::string process_name = runtime.package_name.empty() ? "Game" : runtime.package_name;
+    const std::string process = join_path(runtime.game_dir, process_name);
     setenv("DOORSTOP_PROCESS_PATH", process.c_str(), 1);
     setenv("DOORSTOP_INVOKE_DLL_PATH",
            join_path(runtime.core_dir, "BepInEx.Unity.IL2CPP.dll").c_str(), 1);
@@ -450,6 +460,7 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *)
     runtime.game_dir = join_path(runtime.root, "game");
     runtime.core_dir = join_path(runtime.root, "BepInEx/core");
     runtime.dotnet_dir = join_path(runtime.root, "dotnet");
+    runtime.package_name = application_package_name(env, application);
     runtime.assets = application_assets(env, application);
     if (!runtime.assets || runtime.native_dir.empty() || runtime.root.empty()) {
         LOGE("failed to resolve Android paths");
