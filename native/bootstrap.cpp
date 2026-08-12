@@ -235,7 +235,7 @@ bool extract_payload()
     std::string old;
     std::getline(old_marker, old);
     const std::string probe = join_path(runtime.root, "BepInEx/core/BepInEx.Unity.IL2CPP.dll");
-    const std::string metadata = join_path(runtime.root, "BepInEx/interop/global-metadata.dat");
+    const std::string metadata = join_path(runtime.root, "BepInEx/global-metadata.dat");
     const std::string game_data = join_path(runtime.root, "game/Data/globalgamemanagers");
     if (old == version && access(probe.c_str(), R_OK) == 0 &&
         access(metadata.c_str(), R_OK) == 0 && access(game_data.c_str(), R_OK) == 0)
